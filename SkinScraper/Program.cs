@@ -84,16 +84,17 @@ namespace MyApp
                 _driver.FindElement(By.XPath("//*[@id=\"global_action_menu\"]/a[2]")).Click();
                 System.Threading.Thread.Sleep(1000);
                 var loginFields = _driver.FindElements(By.ClassName("_2GBWeup5cttgbTw8FM3tfx"));
-                loginFields[0].SendKeys(ConfigurationManager.AppSettings["username"]);
-                loginFields[1].SendKeys(ConfigurationManager.AppSettings["password"]);
+                loginFields[0].SendKeys(ConfigurationManager.AppSettings["steamusername"]);
+                loginFields[1].SendKeys(ConfigurationManager.AppSettings["steampassword"]);
                 _driver.FindElement(By.XPath("//*[@id=\"responsive_page_template_content\"]/div[1]/div[1]/div/div/div/div[2]/div/form/div[4]/button")).Click();
             }
             Console.Clear();
-            int currentpage = 1;
+            int currentpage = int.Parse(ConfigurationManager.AppSettings["LastRunPage"]);
             string baseurl = "https://csgoskins.gg/?page=";
             _driver.SwitchTo().Window(_driver.WindowHandles[0]);
             _driver.Navigate().GoToUrl(baseurl + currentpage);
             #endregion
+            Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
             while (true)
             {
                 itemUrls.Clear();
@@ -108,6 +109,9 @@ namespace MyApp
                     ProccessItemPage(url);
                 }
                 currentpage++;
+                config.AppSettings.Settings["LastRunPage"].Value = currentpage.ToString();
+                config.Save(ConfigurationSaveMode.Modified);
+                ConfigurationManager.RefreshSection("appSettings");
             }
         }
 
