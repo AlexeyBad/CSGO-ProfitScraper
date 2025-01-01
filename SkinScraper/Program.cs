@@ -6,9 +6,10 @@ using System.Xml.Linq;
 using System.Configuration;
 using System.Text.Json;
 using System.Globalization;
+using System.Diagnostics;
 
 
-namespace MyApp
+namespace SkinScraper
 {
     public class WebsiteOffers
     {
@@ -59,19 +60,25 @@ namespace MyApp
 
 
         static IWebDriver _driver;
-        static void Main(string[] args)
+        static Config config;
+
+        static async Task Main(string[] args)
         {
             #region setup
+            string configFilePath = "Config.json";
+            config = Config.Load(configFilePath);
+            int currentPage = config.CurrentPage;
+
             ChromeOptions options = new ChromeOptions();
             options.AddArgument("--log-level=1");
             options.AddArgument("--lang=en");
             _driver = new ChromeDriver(options);
-            
+
             ((IJavaScriptExecutor)_driver).ExecuteScript("window.open();");
             _driver.SwitchTo().Window(_driver.WindowHandles[1]);
-            
+
             _driver.Navigate().GoToUrl("https://steamcommunity.com/market/");
-            if (ConfigurationManager.AppSettings["steamguard"].ToString().ToUpper() == "X")
+            if (!string.IsNullOrEmpty(config.SteamGuard))
             {
                 while (IsUserNotLoggedIn(_driver))
                 {
@@ -84,17 +91,16 @@ namespace MyApp
                 _driver.FindElement(By.XPath("//*[@id=\"global_action_menu\"]/a[2]")).Click();
                 System.Threading.Thread.Sleep(1000);
                 var loginFields = _driver.FindElements(By.ClassName("_2GBWeup5cttgbTw8FM3tfx"));
-                loginFields[0].SendKeys(ConfigurationManager.AppSettings["steamusername"]);
-                loginFields[1].SendKeys(ConfigurationManager.AppSettings["steampassword"]);
+                loginFields[0].SendKeys(config.SteamUsername);
+                loginFields[1].SendKeys(config.SteamPassword);
                 _driver.FindElement(By.XPath("//*[@id=\"responsive_page_template_content\"]/div[1]/div[1]/div/div/div/div[2]/div/form/div[4]/button")).Click();
             }
             Console.Clear();
-            int currentpage = int.Parse(ConfigurationManager.AppSettings["LastRunPage"]);
+            int currentpage = int.Parse(config.LastRunPage);
             string baseurl = "https://csgoskins.gg/?page=";
             _driver.SwitchTo().Window(_driver.WindowHandles[0]);
             _driver.Navigate().GoToUrl(baseurl + currentpage);
             #endregion
-            Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
             while (true)
             {
                 itemUrls.Clear();
@@ -106,12 +112,18 @@ namespace MyApp
                 }
                 foreach (var url in itemUrls)
                 {
-                    ProccessItemPage(url);
+                    Stopwatch stopwatch = Stopwatch.StartNew();
+                    await ProccessItemPage(url);
+                    stopwatch.Stop();
+                    long elapsedTimeS = stopwatch.ElapsedMilliseconds / 1000;
+                    if (elapsedTimeS < 1)
+                    {
+                        Thread.Sleep(1000);
+                    }
                 }
                 currentpage++;
-                config.AppSettings.Settings["LastRunPage"].Value = currentpage.ToString();
-                config.Save(ConfigurationSaveMode.Modified);
-                ConfigurationManager.RefreshSection("appSettings");
+                config.CurrentPage = currentPage;
+                Config.Save(configFilePath, config);
             }
         }
 
@@ -128,7 +140,7 @@ namespace MyApp
             }
         }
 
-        static void ProccessItemPage(string url)
+        static async Task ProccessItemPage(string url)
         {
             // Make the depth more clear: Item; Version; 
             versionUrls.Clear();
@@ -139,7 +151,7 @@ namespace MyApp
             foreach (var versionItem in versionsArray)
             {
                 Decimal versionPrice = PriceTextToValue(versionItem.FindElement(By.CssSelector("div:nth-child(1) > div:nth-child(2) > span:nth-child(1)")).Text);
-                if (versionPrice > int.Parse(ConfigurationManager.AppSettings["minValue"]) && versionPrice < int.Parse(ConfigurationManager.AppSettings["maxValue"]))
+                if (versionPrice > config.MinValue && versionPrice < config.MaxValue)
                 {
                     versionUrls.Add(versionItem.GetAttribute("href"));
                 }
@@ -186,7 +198,7 @@ namespace MyApp
                     }
                     if (SellerName.Contains("Steam"))
                     {
-                        int ProfitBasedOn = int.Parse(ConfigurationManager.AppSettings["ProfitBasedOn"]);
+                        int ProfitBasedOn = int.Parse(config.ProfitBasedOn);
                         if (ProfitBasedOn == 2 || ProfitBasedOn == 3)
                         {
                             var steamurl = priceSection.FindElement(By.CssSelector("div.w-full.sm\\:w-1\\/4.p-4.flex-none.text-center.sm\\:text-right > a")).GetAttribute("href");
@@ -211,13 +223,13 @@ namespace MyApp
                     }
                     offers.Add(new WebsiteOffers { name = SellerName, quality = versionName, price = SellerPrice });
                 }
-                Thread.Sleep(1000); 
+                Thread.Sleep(1000);
                 _driver.Close();
                 _driver.SwitchTo().Window(_driver.WindowHandles[0]);
                 _driver.Navigate().Back();
             }
             BestOffer profitOffer = GetBestOffer(offers);
-            if (profitOffer.profit > int.Parse(ConfigurationManager.AppSettings["minProfit"]))
+            if (profitOffer.profit > config.MinProfit)
             {
                 output.AppendLine("Item: " + skinName + " " + profitOffer.quality);
                 output.AppendLine("Shop: " + profitOffer.bestSellerName + " " + profitOffer.bestPrice + " - Profit: " + profitOffer.profit);
@@ -249,7 +261,7 @@ namespace MyApp
                     PropertyNameCaseInsensitive = true
                 };
                 var priceData = JsonSerializer.Deserialize<SteamPriceHistory>(jsonString, options);
-                var lastPrices = priceData.prices.TakeLast(int.Parse(ConfigurationManager.AppSettings["PriceHistoryAmount"])).Reverse();
+                var lastPrices = priceData.prices.TakeLast(int.Parse(config.PriceHistoryAmount)).Reverse();
                 decimal valuesum = 0;
                 foreach (var priceEntry in lastPrices)
                 {
@@ -266,19 +278,20 @@ namespace MyApp
 
             var bestOffer = nonSteamOffers
                 .GroupBy(o => o.quality)
-                .Select(group => {
+                .Select(group =>
+                {
                     var steamPrice = steamOffers.FirstOrDefault(s => string.Equals(s.quality, group.Key, StringComparison.OrdinalIgnoreCase))?.price ?? 0;
 
                     var bestNonSteamOffer = group.OrderBy(o => o.price).First();
 
-                    return new BestOffer {quality = group.Key, bestSellerName = bestNonSteamOffer.name, bestPrice = bestNonSteamOffer.price, steamPrice = steamPrice, profit = Math.Truncate((steamPrice * 0.85m) - bestNonSteamOffer.price)};
+                    return new BestOffer { quality = group.Key, bestSellerName = bestNonSteamOffer.name, bestPrice = bestNonSteamOffer.price, steamPrice = steamPrice, profit = Math.Truncate((steamPrice * 0.85m) - bestNonSteamOffer.price) };
                 }).OrderByDescending(o => o.profit).FirstOrDefault();
             return bestOffer;
         }
 
         static decimal PriceTextToValue(string priceText)
         {
-            if (priceText.Contains("No")) 
+            if (priceText.Contains("No"))
             { // Item Version - No Offers
                 return Convert.ToDecimal(0);
             }
@@ -290,7 +303,7 @@ namespace MyApp
         {
             string[] arrUrlParts = sWebsiteUrl.Split('/');
             return arrUrlParts[arrUrlParts.Length - 2];
-        }
 
+        }
     }
 }
