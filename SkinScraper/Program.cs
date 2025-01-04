@@ -96,6 +96,16 @@ namespace SkinScraper
                 _driver.FindElement(By.XPath("//*[@id=\"responsive_page_template_content\"]/div[1]/div[1]/div/div/div/div[2]/div/form/div[4]/button")).Click();
             }
             Console.Clear();
+            string asciiArt = @"
+             ______             ___ _        ______                                     
+            (_____ \           / __|_)  _   / _____)                                    
+             _____) )___ ___ _| |__ _ _| |_( (____   ____  ____ _____ ____  _____  ____ 
+            |  ____/ ___) _ (_   __) (_   _)\____ \ / ___)/ ___|____ |  _ \| ___ |/ ___)
+            | |   | |  | |_| || |  | | | |_ _____) | (___| |   / ___ | |_| | ____| |    
+            |_|   |_|   \___/ |_|  |_|  \__|______/ \____)_|   \_____|  __/|_____)_|    
+                                                                     |_|                
+            ";
+            Console.WriteLine(asciiArt);
             int currentpage = int.Parse(config.LastRunPage);
             string baseurl = "https://csgoskins.gg/?page=";
             _driver.SwitchTo().Window(_driver.WindowHandles[0]);
@@ -229,12 +239,11 @@ namespace SkinScraper
                 _driver.Navigate().Back();
             }
             BestOffer profitOffer = GetBestOffer(offers);
-            if (profitOffer.profit > config.MinProfit)
-            {
-                output.AppendLine("Item: " + skinName + " " + profitOffer.quality);
-                output.AppendLine("Shop: " + profitOffer.bestSellerName + " " + profitOffer.bestPrice + " - Profit: " + profitOffer.profit);
-                Console.WriteLine(output);
-            }
+
+            Console.ForegroundColor = profitOffer.profit > config.MinProfit ? ConsoleColor.Green : ConsoleColor.Red;
+            output.AppendLine($"Item: {skinName} {profitOffer.quality}, Shop: {profitOffer.bestSellerName} {profitOffer.bestPrice} - Profit: {profitOffer.profit}");
+            Console.WriteLine(output);
+            Console.ResetColor();
             //skip if no steam seller
         }
 
