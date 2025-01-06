@@ -8,29 +8,22 @@ namespace SkinScraper
         public int MinValue { get; set; }
         public int MaxValue { get; set; }
         public int MinProfit { get; set; }
-        public string ProfitBasedOn { get; set; }
-        public string PriceHistoryAmount { get; set; }
-        public string OrderBy { get; set; }
-        public string SteamGuard { get; set; }
-        public string SteamUsername { get; set; }
-        public string SteamPassword { get; set; }
-        public string LastRunPage { get; set; }
+        public required string ProfitBasedOn { get; set; }
+        public required string PriceHistoryAmount { get; set; }
+        public required string SteamGuard { get; set; }
+        public required string SteamUsername { get; set; }
+        public required  string SteamPassword { get; set; }
 
-        public static Config Load(string filePath)
+        public static Config Load(string sFilePath)
         {
-            if (!File.Exists(filePath))
-            {
-                return new Config { CurrentPage = 1 }; // Standardwerte
-            }
-
-            var json = File.ReadAllText(filePath);
-            return JsonSerializer.Deserialize<Config>(json);
+            string sJson = File.ReadAllText(sFilePath);
+            return JsonSerializer.Deserialize<Config>(sJson);
         }
 
-        public static void Save(string filePath, Config config)
+        public static void Save(string sFilePath, Config config)
         {
-            var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(filePath, json);
+            string sJson = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(sFilePath, sJson);
         }
     }
 }

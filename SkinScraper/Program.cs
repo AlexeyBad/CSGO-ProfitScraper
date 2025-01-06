@@ -10,7 +10,6 @@ using System.Diagnostics;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
 
-
 namespace SkinScraper
 {
     public class WebsiteOffers
@@ -59,15 +58,17 @@ namespace SkinScraper
         static List<string> versionUrls = new List<string>();
         static List<WebsiteOffers> offers = new List<WebsiteOffers>();
 
+        static Config _config;
         static IWebDriver _driver;
-        static Config config;
+        static Random random = new Random();
 
         static async Task Main(string[] args)
         {
             #region setup
+            Console.Title = "CSGOSKINS.GG - ProfitScraper";
             string configFilePath = "Config.json";
-            config = Config.Load(configFilePath);
-            int currentPage = config.CurrentPage;
+            _config = Config.Load(configFilePath);
+            int currentPage = _config.CurrentPage;
 
             ChromeOptions options = new ChromeOptions();
             options.AddArgument("--lang=en");
@@ -75,7 +76,6 @@ namespace SkinScraper
             options.AddArgument("--headless");
 
             options.AddArgument("--window-size=1920,1080");
-            options.AddArgument("--start-maximized");
 
             options.AddArgument("--disable-blink-features=AutomationControlled");
             options.AddExcludedArgument("enable-automation");
@@ -87,7 +87,7 @@ namespace SkinScraper
             _driver.SwitchTo().Window(_driver.WindowHandles[1]);
 
             _driver.Navigate().GoToUrl("https://steamcommunity.com/market/");
-            if (!string.IsNullOrEmpty(config.SteamGuard))
+            if (!string.IsNullOrEmpty(_config.SteamGuard))
             {
                 while (IsUserNotLoggedIn(_driver))
                 {
@@ -98,15 +98,15 @@ namespace SkinScraper
             {
                 //Todo: better selectors
                 _driver.FindElement(By.XPath("//*[@id=\"global_action_menu\"]/a[2]")).Click();
-                System.Threading.Thread.Sleep(1000);
-                var loginFields = _driver.FindElements(By.ClassName("_2GBWeup5cttgbTw8FM3tfx"));
-                loginFields[0].SendKeys(config.SteamUsername);
-                loginFields[1].SendKeys(config.SteamPassword);
+
+                var loginFields = new WebDriverWait(_driver, TimeSpan.FromSeconds(5))
+                    .Until(ExpectedConditions.PresenceOfAllElementsLocatedBy(By.ClassName("_2GBWeup5cttgbTw8FM3tfx")));
+                loginFields[0].SendKeys(_config.SteamUsername);
+                loginFields[1].SendKeys(_config.SteamPassword);
                 _driver.FindElement(By.XPath("//*[@id=\"responsive_page_template_content\"]/div[1]/div[1]/div/div/div/div[2]/div/form/div[4]/button")).Click();
-                Thread.Sleep(2000); // Replace with wait until @everywhere
             }
             Console.Clear();
-            string asciiArt = @"
+            string sAsciiArt = @"
              ______             ___ _        ______                                     
             (_____ \           / __|_)  _   / _____)                                    
              _____) )___ ___ _| |__ _ _| |_( (____   ____  ____ _____ ____  _____  ____ 
@@ -115,8 +115,8 @@ namespace SkinScraper
             |_|   |_|   \___/ |_|  |_|  \__|______/ \____)_|   \_____|  __/|_____)_|    
                                                                      |_|                
             ";
-            Console.WriteLine(asciiArt);
-            int currentpage = int.Parse(config.LastRunPage);
+            Console.WriteLine(sAsciiArt);
+            int currentpage = _config.CurrentPage;
             string baseurl = "https://csgoskins.gg/?page=";
             _driver.SwitchTo().Window(_driver.WindowHandles[0]);
             _driver.Navigate().GoToUrl(baseurl + currentpage);
@@ -127,13 +127,21 @@ namespace SkinScraper
                 _driver.Navigate().GoToUrl(baseurl + currentpage);
                 var itemArray = _driver.FindElements(By.CssSelector("div.bg-gray-800.rounded.shadow-md.relative.flex.flex-wrap"));
                 foreach (var item in itemArray)
-                {   // add each item url of page 
-                    itemUrls.Add(item.FindElement(By.CssSelector("h2 > a")).GetAttribute("href"));
+                {   
+                    var PriceRange = item.FindElements(By.ClassName("hover:underline"));
+                    for (int i = 0; i < PriceRange.Count - 1; i++)
+                    {
+                        if (PriceTextToValue(PriceRange[i].Text) > _config.MinValue && PriceTextToValue(PriceRange[i].Text) < _config.MaxValue)
+                        {
+                            itemUrls.Add(item.FindElement(By.CssSelector("h2 > a")).GetAttribute("href"));
+                            break;
+                        }
+                    }
                 }
                 foreach (var url in itemUrls)
                 {
                     Stopwatch stopwatch = Stopwatch.StartNew();
-                    await ProccessItemPage(url);
+                    ProccessItemPage(url);
                     stopwatch.Stop();
                     long elapsedTimeS = stopwatch.ElapsedMilliseconds / 1000;
                     if (elapsedTimeS < 1)
@@ -142,8 +150,10 @@ namespace SkinScraper
                     }
                 }
                 currentpage++;
-                config.CurrentPage = currentPage;
-                Config.Save(configFilePath, config);
+                _config.CurrentPage = currentPage;
+                Config.Save(configFilePath, _config);
+                
+                Thread.Sleep(random.Next(5, 8) * 1000);
             }
         }
 
@@ -160,9 +170,10 @@ namespace SkinScraper
             }
         }
 
-        static async Task ProccessItemPage(string url)
+        static void ProccessItemPage(string url)
         {
             // Make the depth more clear: Item; Version; 
+            WebDriverWait wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(5));
             versionUrls.Clear();
             offers.Clear();
             _driver.Navigate().GoToUrl(url);
@@ -170,7 +181,7 @@ namespace SkinScraper
             foreach (var versionItem in versionsArray)
             {
                 Decimal versionPrice = PriceTextToValue(versionItem.FindElement(By.CssSelector("div:nth-child(1) > div:nth-child(2) > span:nth-child(1)")).Text);
-                if (versionPrice > config.MinValue && versionPrice < config.MaxValue)
+                if (versionPrice > _config.MinValue && versionPrice < _config.MaxValue)
                 {
                     versionUrls.Add(versionItem.GetAttribute("href"));
                 }
@@ -183,6 +194,7 @@ namespace SkinScraper
             string skinName = "";
             foreach (var versionUrl in versionUrls)
             {
+                Thread.Sleep(1000);
                 ((IJavaScriptExecutor)_driver).ExecuteScript("window.open();");
                 _driver.SwitchTo().Window(_driver.WindowHandles[2]);
                 _driver.Navigate().GoToUrl(versionUrl);
@@ -195,45 +207,50 @@ namespace SkinScraper
                 if (showMoreButtons.Count > 0)
                 {
                     showMoreButtons[0].Click();
-                    System.Threading.Thread.Sleep(1000);
                 }
+                var priceSections = wait.Until(ExpectedConditions.PresenceOfAllElementsLocatedBy(By.CssSelector("div.active-offer")));
+                bool bItemSoldOnSteam = false;
+                foreach (var priceSection in priceSections)
+                {
+                  if (priceSection.FindElement(By.CssSelector("div.w-full.whitespace-nowrap a")).Text == "Steam")
+                        bItemSoldOnSteam = true;
+                }
+                if (!bItemSoldOnSteam)
+                {
+                    _driver.Close();
+                    _driver.SwitchTo().Window(_driver.WindowHandles[0]);
+                    _driver.Navigate().Back();
 
-                var priceSections = _driver.FindElements(By.CssSelector("div.active-offer"));
+                    continue;
+                }
                 foreach (var priceSection in priceSections)
                 {
                     string SellerName;
                     decimal SellerPrice;
 
+                    SellerName = priceSection.FindElement(By.CssSelector("div.w-full.whitespace-nowrap a")).Text;
+
                     bool isRecommended = priceSection.GetAttribute("class").Contains("border-blue-700");
-                    if (isRecommended)
-                    {
-                        SellerName = priceSection.FindElement(By.CssSelector("div.w-full.whitespace-nowrap a")).Text;
-                        SellerPrice = PriceTextToValue(_driver.FindElement(By.XPath("/html/body/main/div[2]/div[2]/div[1]/div[2]/div[4]/div[2]/span")).Text);
-                    }
-                    else
-                    {
-                        SellerName = priceSection.FindElement(By.CssSelector("div.w-full.whitespace-nowrap a")).Text;
-                        SellerPrice = PriceTextToValue(priceSection.FindElement(By.CssSelector("div.w-1\\/2.sm\\:w-1\\/4.p-4.flex-none span.font-bold.text-lg.sm\\:text-xl")).Text);
-                    }
+                    SellerPrice = isRecommended
+                        ? PriceTextToValue(_driver.FindElement(By.XPath("/html/body/main/div[2]/div[2]/div[1]/div[2]/div[4]/div[2]/span")).Text)
+                        : PriceTextToValue(priceSection.FindElement(By.CssSelector("div.w-1\\/2.sm\\:w-1\\/4.p-4.flex-none span.font-bold.text-lg.sm\\:text-xl")).Text);
                     if (SellerName.Contains("Steam"))
                     {
-                        int ProfitBasedOn = int.Parse(config.ProfitBasedOn);
+                        int ProfitBasedOn = int.Parse(_config.ProfitBasedOn);
                         if (ProfitBasedOn == 2 || ProfitBasedOn == 3)
                         {
                             var steamurl = priceSection.FindElement(By.CssSelector("div.w-full.sm\\:w-1\\/4.p-4.flex-none.text-center.sm\\:text-right > a")).GetAttribute("href");
                             _driver.SwitchTo().Window(_driver.WindowHandles[1]);
                             _driver.Navigate().GoToUrl(steamurl);
-                            Thread.Sleep(1000);
                             if (ProfitBasedOn == 2)
                             { // Direct Buy 
-                                SellerPrice = PriceTextToValue(_driver.FindElement(By.CssSelector("#market_commodity_buyrequests > span:nth-child(2)")).Text);
+                                SellerPrice = PriceTextToValue(wait.Until(ExpectedConditions.ElementIsVisible(By.CssSelector("#market_commodity_buyrequests > span:nth-child(2)"))).Text);
                             }
                             else if (ProfitBasedOn == 3)
                             { // Price History
                                 SellerPrice = GetSteamSaleHistory(_driver);
                             }
                             _driver.SwitchTo().Window(_driver.WindowHandles[2]);
-                            Thread.Sleep(1000);
                         }
                     }
                     if (SellerName.Contains("BUFF163"))
@@ -241,18 +258,20 @@ namespace SkinScraper
                         continue;
                     }
                     offers.Add(new WebsiteOffers { name = SellerName, quality = versionName, price = SellerPrice });
+
                 }
-                Thread.Sleep(1000);
                 _driver.Close();
                 _driver.SwitchTo().Window(_driver.WindowHandles[0]);
                 _driver.Navigate().Back();
             }
-            BestOffer profitOffer = GetBestOffer(offers);
+            if (offers.Count > 0)
+            {
+                BestOffer profitOffer = GetBestOffer(offers);
 
-            Console.ForegroundColor = profitOffer.profit > config.MinProfit ? ConsoleColor.Green : ConsoleColor.Red;
-            Console.WriteLine($"Item: {skinName} {profitOffer.quality}, Shop: {profitOffer.bestSellerName} {profitOffer.bestPrice} - Profit: {profitOffer.profit}");
-            Console.ResetColor();
-            //skip if no steam seller
+                Console.ForegroundColor = profitOffer.profit > _config.MinProfit ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.WriteLine($"Item: {skinName} {profitOffer.quality}, Shop: {profitOffer.bestSellerName} {profitOffer.bestPrice} - Profit: {profitOffer.profit}");
+                Console.ResetColor();
+            }
         }
 
         static decimal GetSteamSaleHistory(IWebDriver driver)
@@ -267,18 +286,13 @@ namespace SkinScraper
                 }
                 var apiUrl = "https://steamcommunity.com/market/pricehistory/?appid=730&market_hash_name=" + Path.GetFileName(driver.Url);
                 var response = client.GetAsync(apiUrl).Result;
-                if (response.IsSuccessStatusCode == false)
-                {
-                    Console.WriteLine("Steam History: Error");
-                    return 999; //return something else 
-                }
                 var jsonString = response.Content.ReadAsStringAsync().Result;
                 var options = new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 };
                 var priceData = JsonSerializer.Deserialize<SteamPriceHistory>(jsonString, options);
-                var lastPrices = priceData.prices.TakeLast(int.Parse(config.PriceHistoryAmount)).Reverse();
+                var lastPrices = priceData.prices.TakeLast(int.Parse(_config.PriceHistoryAmount)).Reverse();
                 decimal valuesum = 0;
                 foreach (var priceEntry in lastPrices)
                 {
