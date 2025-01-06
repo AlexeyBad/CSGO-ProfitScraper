@@ -7,6 +7,8 @@ using System.Configuration;
 using System.Text.Json;
 using System.Globalization;
 using System.Diagnostics;
+using OpenQA.Selenium.Support.UI;
+using SeleniumExtras.WaitHelpers;
 
 
 namespace SkinScraper
@@ -56,8 +58,6 @@ namespace SkinScraper
         static List<string> itemUrls = new List<string>();
         static List<string> versionUrls = new List<string>();
         static List<WebsiteOffers> offers = new List<WebsiteOffers>();
-        static StringBuilder output = new StringBuilder();
-
 
         static IWebDriver _driver;
         static Config config;
@@ -70,8 +70,17 @@ namespace SkinScraper
             int currentPage = config.CurrentPage;
 
             ChromeOptions options = new ChromeOptions();
-            options.AddArgument("--log-level=1");
             options.AddArgument("--lang=en");
+            options.AddArgument("--log-level=3");
+            options.AddArgument("--headless");
+
+            options.AddArgument("--window-size=1920,1080");
+            options.AddArgument("--start-maximized");
+
+            options.AddArgument("--disable-blink-features=AutomationControlled");
+            options.AddExcludedArgument("enable-automation");
+            options.AddArgument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.199 Safari/537.36");
+
             _driver = new ChromeDriver(options);
 
             ((IJavaScriptExecutor)_driver).ExecuteScript("window.open();");
@@ -94,6 +103,7 @@ namespace SkinScraper
                 loginFields[0].SendKeys(config.SteamUsername);
                 loginFields[1].SendKeys(config.SteamPassword);
                 _driver.FindElement(By.XPath("//*[@id=\"responsive_page_template_content\"]/div[1]/div[1]/div/div/div/div[2]/div/form/div[4]/button")).Click();
+                Thread.Sleep(2000); // Replace with wait until @everywhere
             }
             Console.Clear();
             string asciiArt = @"
@@ -154,7 +164,6 @@ namespace SkinScraper
         {
             // Make the depth more clear: Item; Version; 
             versionUrls.Clear();
-            output.Clear();
             offers.Clear();
             _driver.Navigate().GoToUrl(url);
             var versionsArray = _driver.FindElements(By.ClassName("version-link"));
@@ -241,8 +250,7 @@ namespace SkinScraper
             BestOffer profitOffer = GetBestOffer(offers);
 
             Console.ForegroundColor = profitOffer.profit > config.MinProfit ? ConsoleColor.Green : ConsoleColor.Red;
-            output.AppendLine($"Item: {skinName} {profitOffer.quality}, Shop: {profitOffer.bestSellerName} {profitOffer.bestPrice} - Profit: {profitOffer.profit}");
-            Console.WriteLine(output);
+            Console.WriteLine($"Item: {skinName} {profitOffer.quality}, Shop: {profitOffer.bestSellerName} {profitOffer.bestPrice} - Profit: {profitOffer.profit}");
             Console.ResetColor();
             //skip if no steam seller
         }
