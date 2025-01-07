@@ -4,6 +4,7 @@ namespace SkinScraper
 {
     internal class Config
     {
+        public required string BaseUrl { get; set; } // Example: https://csgoskins.gg/?page=
         public int CurrentPage { get; set; }
         public int MinValue { get; set; }
         public int MaxValue { get; set; }

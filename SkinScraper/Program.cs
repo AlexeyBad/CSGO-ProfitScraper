@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Diagnostics;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
+using System.Text;
 
 namespace SkinScraper
 {
@@ -44,6 +45,7 @@ namespace SkinScraper
 
     internal class Program
     {
+        static List<Offer> pageOffers = new List<Offer>(); // TXT export
         static Config _config;
         static IWebDriver _driver;
 
@@ -102,14 +104,12 @@ namespace SkinScraper
                                                                      |_|                
             ";
             Console.WriteLine(sAsciiArt);
-            string sBaseurl = "https://csgoskins.gg/?page=";
             _driver.SwitchTo().Window(_driver.WindowHandles[0]);
-            _driver.Navigate().GoToUrl(sBaseurl + _config.CurrentPage);
             #endregion
             while (true)
             {
                 lItemUrls.Clear();
-                _driver.Navigate().GoToUrl(sBaseurl + _config.CurrentPage);
+                _driver.Navigate().GoToUrl(_config.BaseUrl + _config.CurrentPage);
                 var itemArray = _driver.FindElements(By.CssSelector("div.bg-gray-800.rounded.shadow-md.relative.flex.flex-wrap"));
                 foreach (var item in itemArray)
                 {   
@@ -245,7 +245,7 @@ namespace SkinScraper
                     {
                         continue;
                     }
-                    lOffers.Add(new Offer { ShopName = sShopName, Quality = sQualityName, Price = dShopPrice });
+                    lOffers.Add(new Offer { SkinName = sSkinName, ShopName = sShopName, Quality = sQualityName, Price = dShopPrice });
                 }
                 _driver.Close();
                 _driver.SwitchTo().Window(_driver.WindowHandles[0]);
@@ -254,6 +254,7 @@ namespace SkinScraper
             if (lOffers.Count > 0)
             {
                 Offer bestOffer = GetBestOffer(lOffers);
+                SaveOfferToFile(bestOffer, _config.CurrentPage);
 
                 Console.ForegroundColor = bestOffer.Profit > _config.MinProfit ? ConsoleColor.Green : ConsoleColor.Red;
                 Console.WriteLine($"Item: {sSkinName} {bestOffer.Quality}, Shop: {bestOffer.ShopName} {bestOffer.Price} - Profit: {bestOffer.Profit}");
@@ -302,7 +303,7 @@ namespace SkinScraper
 
                     var bestNonSteamOffer = group.OrderBy(o => o.Price).First();
 
-                    return new Offer { Quality = group.Key, ShopName = bestNonSteamOffer.ShopName, Price = bestNonSteamOffer.Price, SteamPrice = steamPrice, Profit = Math.Max(0, Math.Truncate((steamPrice * 0.85m) - bestNonSteamOffer.Price)) };
+                    return new Offer { SkinName = bestNonSteamOffer.SkinName , Quality = group.Key, ShopName = bestNonSteamOffer.ShopName, Price = bestNonSteamOffer.Price, SteamPrice = steamPrice, Profit = Math.Max(0, Math.Truncate((steamPrice * 0.85m) - bestNonSteamOffer.Price)) };
                 }).OrderByDescending(o => o.Profit).FirstOrDefault();
             return bestOffer;
         }
@@ -323,5 +324,19 @@ namespace SkinScraper
             return arrUrlParts[arrUrlParts.Length - 2];
 
         }
+
+        static void SaveOfferToFile(Offer offer, int iCurrentPage)
+        {
+            var stringBuilder = new StringBuilder();
+            string fileName = "Results.txt";
+            if (!File.Exists(fileName))
+            {
+                stringBuilder.AppendLine("Page,Date,SkinName,Quality,Shop,Price,SteamPrice,Profit");
+            }
+            stringBuilder.AppendLine($"{iCurrentPage},{DateTime.Now:yyyy-MM-dd},{offer.SkinName},{offer.Quality},{offer.ShopName},{offer.Price},{offer.SteamPrice},{offer.Profit}");
+
+            File.AppendAllText(fileName, stringBuilder.ToString());
+        }
+
     }
 }
