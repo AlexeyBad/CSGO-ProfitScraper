@@ -8,9 +8,9 @@ namespace SkinScraper
         public int MinValue { get; set; }
         public int MaxValue { get; set; }
         public int MinProfit { get; set; }
-        public required string ProfitBasedOn { get; set; }
-        public required string PriceHistoryAmount { get; set; }
-        public required string SteamGuard { get; set; }
+        public required string ProfitBasedOn { get; set; } // 1 Cheapest Seller; 2 Instant Sell; Based on Steam History
+        public required string PriceHistoryAmount { get; set; } // The amount of last sales to check
+        public required string SteamGuard { get; set; } // X if you have Steam Guard enabled
         public required string SteamUsername { get; set; }
         public required  string SteamPassword { get; set; }
 
