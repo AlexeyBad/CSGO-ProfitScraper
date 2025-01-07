@@ -68,7 +68,6 @@ namespace SkinScraper
             Console.Title = "CSGOSKINS.GG - ProfitScraper";
             string configFilePath = "Config.json";
             _config = Config.Load(configFilePath);
-            int currentPage = _config.CurrentPage;
 
             ChromeOptions options = new ChromeOptions();
             options.AddArgument("--lang=en");
@@ -116,15 +115,14 @@ namespace SkinScraper
                                                                      |_|                
             ";
             Console.WriteLine(sAsciiArt);
-            int currentpage = _config.CurrentPage;
             string baseurl = "https://csgoskins.gg/?page=";
             _driver.SwitchTo().Window(_driver.WindowHandles[0]);
-            _driver.Navigate().GoToUrl(baseurl + currentpage);
+            _driver.Navigate().GoToUrl(baseurl + _config.CurrentPage);
             #endregion
             while (true)
             {
                 itemUrls.Clear();
-                _driver.Navigate().GoToUrl(baseurl + currentpage);
+                _driver.Navigate().GoToUrl(baseurl + _config.CurrentPage);
                 var itemArray = _driver.FindElements(By.CssSelector("div.bg-gray-800.rounded.shadow-md.relative.flex.flex-wrap"));
                 foreach (var item in itemArray)
                 {   
@@ -149,8 +147,7 @@ namespace SkinScraper
                         Thread.Sleep(1000);
                     }
                 }
-                currentpage++;
-                _config.CurrentPage = currentPage;
+                _config.CurrentPage++;
                 Config.Save(configFilePath, _config);
                 
                 Thread.Sleep(random.Next(5, 8) * 1000);
@@ -258,7 +255,6 @@ namespace SkinScraper
                         continue;
                     }
                     offers.Add(new WebsiteOffers { name = SellerName, quality = versionName, price = SellerPrice });
-
                 }
                 _driver.Close();
                 _driver.SwitchTo().Window(_driver.WindowHandles[0]);
