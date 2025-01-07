@@ -20,7 +20,7 @@ namespace SkinScraper
     }
 
     public class SteamPriceEntry
-    {
+    {   
         public DateTime Date { get; set; }
         public double Price { get; set; }
         public int Volume { get; set; }
@@ -251,7 +251,7 @@ namespace SkinScraper
                 _driver.SwitchTo().Window(_driver.WindowHandles[0]);
                 _driver.Navigate().Back();
             }
-            if (lOffers.Count > 0)
+            if (lOffers.Count > 1)
             {
                 Offer bestOffer = GetBestOffer(lOffers);
                 SaveOfferToFile(bestOffer, _config.CurrentPage);
