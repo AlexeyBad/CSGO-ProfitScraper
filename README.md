@@ -1,7 +1,10 @@
-# CSGO-ProfitScraper: Advanced Market Scraping & Analysis
+# CSGO-ProfitScraper: Advanced Market Scraping
 
-## CSGO-ProfitScraper is a C# application designed to analyze and scrape CS:GO skin market data to identify profitable deals based on configurable parameters. This tool integrates with Selenium for web automation.
+## CSGO-ProfitScraper is a C# application designed to analyze and scrape CS:GO skin market-data to identify profitable deals based on configurable parameters. This tool integrates with Selenium for web automation.
 <br>
+
+![ProfitScraper-removebg-preview](https://github.com/user-attachments/assets/5d941a8b-1f12-42bb-880c-3b73d39f1fb7)
+
 
 **Features**
 
